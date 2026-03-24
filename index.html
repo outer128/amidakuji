@@ -8,7 +8,6 @@
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 20px;
-    background-color: #f0f4f8;
     color: #333;
   }
   h1 {
@@ -70,11 +69,11 @@
   .number-label {
     position: absolute;
     width: 40px;
-    margin-left: -20px; /* 中心を合わせるためのネガティブマージン */
+    margin-left: -20px; 
     text-align: center;
     font-weight: bold;
     font-size: 18px;
-    color: #d9534f;
+    color: #000;
   }
   .goal-input {
     position: absolute;
@@ -108,7 +107,7 @@
 </head>
 <body>
 
-  <h1>🎯 あみだくじジェネレーター</h1>
+  <h1>あみだくじジェネレーター</h1>
 
   <div class="controls-container">
     <label for="num-lines">縦線の本数 (2〜15): </label>
@@ -126,7 +125,7 @@
 
   <div class="controls-container" style="margin-top: 20px;">
     <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
-      下部の入力欄に、左から順にゴールの数字（1から縦線の本数まで）を重複しないように入力してください。
+      上部の入力欄に、左から順にゴールの数字（1から縦線の本数まで）を重複しないように入力してください。
     </p>
     <button id="btn-generate" style="background-color: #28a745; font-size: 18px; padding: 10px 24px;">あみだくじを生成する</button>
     <div id="error-msg"></div>
