@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>あみだくじジェネレーター</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 20px;
+    background-color: #f0f4f8;
+    color: #333;
+  }
+  h1 {
+    text-align: center;
+    font-size: 24px;
+  }
+  .controls-container {
+    max-width: 600px;
+    margin: 0 auto 20px auto;
+    padding: 15px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    text-align: center;
+  }
+  .controls-container label {
+    font-weight: bold;
+  }
+  .controls-container input[type="number"] {
+    width: 60px;
+    padding: 5px;
+    font-size: 16px;
+    margin-right: 10px;
+  }
+  button {
+    padding: 8px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+  button:hover {
+    background-color: #0056b3;
+  }
+  
+  .amida-wrapper {
+    position: relative;
+    width: 600px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 20px 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-radius: 8px;
+  }
+  
+  #start-numbers {
+    position: relative;
+    height: 30px;
+  }
+  #goal-inputs {
+    position: relative;
+    height: 40px;
+    margin-top: 10px;
+  }
+  
+  .number-label {
+    position: absolute;
+    width: 40px;
+    margin-left: -20px; /* 中心を合わせるためのネガティブマージン */
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+    color: #d9534f;
+  }
+  .goal-input {
+    position: absolute;
+    width: 40px;
+    margin-left: -20px;
+    text-align: center;
+    font-size: 16px;
+    padding: 4px 0;
+    box-sizing: border-box;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+  }
+  .goal-input:focus {
+    border-color: #007bff;
+    outline: none;
+  }
+  
+  canvas {
+    display: block;
+    margin: 0 auto;
+  }
+  
+  #error-msg {
+    color: #d9534f;
+    font-weight: bold;
+    margin-top: 15px;
+    text-align: center;
+    min-height: 20px;
+  }
+</style>
+</head>
+<body>
+
+  <h1>🎯 あみだくじジェネレーター</h1>
+
+  <div class="controls-container">
+    <label for="num-lines">縦線の本数 (2〜15): </label>
+    <input type="number" id="num-lines" value="5" min="2" max="15">
+    <button id="btn-setup">設定を適用</button>
+  </div>
+
+  <div class="amida-wrapper">
+    <div id="start-numbers"></div>
+    
+    <canvas id="amida-canvas" width="600" height="400"></canvas>
+    
+    <div id="goal-inputs"></div>
+  </div>
+
+  <div class="controls-container" style="margin-top: 20px;">
+    <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
+      下部の入力欄に、左から順にゴールの数字（1から縦線の本数まで）を重複しないように入力してください。
+    </p>
+    <button id="btn-generate" style="background-color: #28a745; font-size: 18px; padding: 10px 24px;">あみだくじを生成する</button>
+    <div id="error-msg"></div>
+  </div>
+
+<script>
+  const CANVAS_WIDTH = 600;
+  const CANVAS_DEFAULT_HEIGHT = 400;
+  const X_MARGIN = 50; // キャンバス左右の余白
+
+  let currentLinesCount = 5;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setupUI(currentLinesCount);
+
+    document.getElementById('btn-setup').addEventListener('click', () => {
+      const numInput = parseInt(document.getElementById('num-lines').value);
+      if (isNaN(numInput) || numInput < 2 || numInput > 15) {
+        alert("2から15の間の数字を入力してください。");
+        return;
+      }
+      currentLinesCount = numInput;
+      setupUI(currentLinesCount);
+    });
+
+    document.getElementById('btn-generate').addEventListener('click', generateAmida);
+  });
+
+  // UI（縦線の間隔、番号、入力欄）をセットアップする関数
+  function setupUI(n) {
+    const spacing = (CANVAS_WIDTH - 2 * X_MARGIN) / (n - 1);
+    
+    const startDiv = document.getElementById('start-numbers');
+    const goalDiv = document.getElementById('goal-inputs');
+    startDiv.innerHTML = '';
+    goalDiv.innerHTML = '';
+
+    for (let i = 0; i < n; i++) {
+      const xPos = X_MARGIN + i * spacing;
+
+      // 上部のスタート番号
+      const label = document.createElement('div');
+      label.className = 'number-label';
+      label.innerText = i + 1;
+      label.style.left = xPos + 'px';
+      startDiv.appendChild(label);
+
+      // 下部のゴール入力欄
+      const input = document.createElement('input');
+      input.type = 'text'; // スマホ等で数値入力キーボードを出しつつ、自由な操作を担保
+      input.inputMode = 'numeric';
+      input.className = 'goal-input';
+      input.style.left = xPos + 'px';
+      // デフォルトで1〜nをランダムに配置してあげる（親切設計）
+      input.value = ""; 
+      goalDiv.appendChild(input);
+    }
+
+    // キャンバスをクリアして縦線だけ描画
+    const canvas = document.getElementById('amida-canvas');
+    canvas.height = CANVAS_DEFAULT_HEIGHT;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < n; i++) {
+      const x = X_MARGIN + i * spacing;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    
+    document.getElementById('error-msg').innerText = '';
+  }
+
+  // あみだくじを計算して生成する関数
+  function generateAmida() {
+    const n = currentLinesCount;
+    const inputs = document.querySelectorAll('.goal-input');
+    const errorMsg = document.getElementById('error-msg');
+    
+    let targets = [];
+    let isValid = true;
+
+    // 入力値の取得とバリデーション
+    inputs.forEach(input => {
+      const val = parseInt(input.value);
+      if (isNaN(val) || val < 1 || val > n) {
+        isValid = false;
+      }
+      targets.push(val);
+    });
+
+    const uniqueTargets = new Set(targets);
+    if (!isValid || uniqueTargets.size !== n) {
+      errorMsg.innerText = `エラー：1から${n}までの数字を、重複や空欄がないように入力してください。`;
+      return;
+    }
+    errorMsg.innerText = '';
+
+    // あみだくじのロジック生成
+    let history = [];
+    let current = [];
+    for (let i = 1; i <= n; i++) current.push(i);
+
+    // 1. まず適当にランダムな横線を入れて「あみだくじっぽさ」を出す
+    const randomLineCount = n * 2; 
+    for (let i = 0; i < randomLineCount; i++) {
+      const idx = Math.floor(Math.random() * (n - 1));
+      history.push(idx);
+      // 状態を更新（隣接する要素を交換）
+      let temp = current[idx];
+      current[idx] = current[idx + 1];
+      current[idx + 1] = temp;
+    }
+
+    // 2. 現在のランダムな状態から、ユーザーが指定したゴール状態に強制的に合わせる（バブルソートの応用）
+    for (let i = 0; i < n; i++) {
+      const targetVal = targets[i];
+      let pos = current.indexOf(targetVal);
+      // 目標の位置(i)まで左に要素を移動させながら横線を記録
+      for (let j = pos; j > i; j--) {
+        let temp = current[j];
+        current[j] = current[j - 1];
+        current[j - 1] = temp;
+        history.push(j - 1);
+      }
+    }
+
+    drawLines(n, history);
+  }
+
+  // キャンバスに線を描画する関数
+  function drawLines(n, history) {
+    const canvas = document.getElementById('amida-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // 線の数が多すぎると詰まってしまうため、キャンバスの高さを自動調整
+    const minLineSpacing = 25;
+    const requiredHeight = (history.length + 1) * minLineSpacing;
+    canvas.height = Math.max(CANVAS_DEFAULT_HEIGHT, requiredHeight);
+
+    // 白紙に戻す
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const spacing = (CANVAS_WIDTH - 2 * X_MARGIN) / (n - 1);
+
+    // 縦線の描画
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < n; i++) {
+      const x = X_MARGIN + i * spacing;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+
+    // 横線の描画
+    const ySpacing = canvas.height / (history.length + 1);
+    ctx.strokeStyle = '#007bff'; // 横線は青色にして見やすく
+    ctx.lineWidth = 4;
+
+    for (let k = 0; k < history.length; k++) {
+      const lineIndex = history[k]; // 0 〜 n-2 の値
+      const y = ySpacing * (k + 1);
+      const x1 = X_MARGIN + lineIndex * spacing;
+      const x2 = x1 + spacing;
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y);
+      ctx.lineTo(x2, y);
+      ctx.stroke();
+    }
+  }
+</script>
+
+</body>
+</html>
