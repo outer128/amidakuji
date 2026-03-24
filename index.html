@@ -203,6 +203,7 @@
     document.getElementById('error-msg').innerText = '';
   }
 
+
   // あみだくじを計算して生成する関数
   function generateAmida() {
     const n = currentLinesCount;
@@ -228,37 +229,45 @@
     }
     errorMsg.innerText = '';
 
-    // あみだくじのロジック生成
+    let current = [...targets];
     let history = [];
-    let current = [];
-    for (let i = 1; i <= n; i++) current.push(i);
-
-    // 1. まず適当にランダムな横線を入れて「あみだくじっぽさ」を出す
+    
     const randomLineCount = n * 2; 
     for (let i = 0; i < randomLineCount; i++) {
       const idx = Math.floor(Math.random() * (n - 1));
       history.push(idx);
-      // 状態を更新（隣接する要素を交換）
+      
       let temp = current[idx];
       current[idx] = current[idx + 1];
       current[idx + 1] = temp;
     }
 
-    // 2. 現在のランダムな状態から、ユーザーが指定したゴール状態に強制的に合わせる（バブルソートの応用）
-    for (let i = 0; i < n; i++) {
-      const targetVal = targets[i];
-      let pos = current.indexOf(targetVal);
-      // 目標の位置(i)まで左に要素を移動させながら横線を記録
-      for (let j = pos; j > i; j--) {
-        let temp = current[j];
-        current[j] = current[j - 1];
-        current[j - 1] = temp;
-        history.push(j - 1);
+    while (true) {
+      let inversions = [];
+      for (let i = 0; i < n - 1; i++) {
+        if (current[i] > current[i + 1]) {
+          inversions.push(i);
+        }
       }
+
+      if (inversions.length === 0) {
+        break;
+      }
+
+      const randomInvIdx = Math.floor(Math.random() * inversions.length);
+      const idx = inversions[randomInvIdx];
+      
+      history.push(idx);
+      let temp = current[idx];
+      current[idx] = current[idx + 1];
+      current[idx + 1] = temp;
     }
+
+    history.reverse();
 
     drawLines(n, history);
   }
+
 
   // キャンバスに線を描画する関数
   function drawLines(n, history) {
