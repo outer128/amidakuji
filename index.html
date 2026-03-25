@@ -27,11 +27,18 @@
   .controls-container label {
     font-weight: bold;
   }
-  .controls-container input[type="number"] {
+  .input-group {
+    margin-bottom: 15px;
+  }
+  .input-group input[type="number"] {
     width: 60px;
     padding: 5px;
     font-size: 16px;
     margin-right: 10px;
+  }
+  input[type="range"] {
+    width: 80%;
+    margin-top: 10px;
   }
   button {
     padding: 8px 16px;
@@ -57,24 +64,20 @@
     border-radius: 8px;
   }
   
-  #start-numbers {
+  #start-numbers, #goal-inputs {
     position: relative;
     height: 30px;
   }
-  #goal-inputs {
-    position: relative;
-    height: 40px;
-    margin-top: 10px;
-  }
+  #goal-inputs { margin-top: 10px; }
   
   .number-label {
     position: absolute;
     width: 40px;
-    margin-left: -20px; 
+    margin-left: -20px;
     text-align: center;
     font-weight: bold;
     font-size: 18px;
-    color: #000;
+    color: #d9534f;
   }
   .goal-input {
     position: absolute;
@@ -108,40 +111,53 @@
 </head>
 <body>
 
-  <h1>あみだくじジェネレーター</h1>
+  <h1>🎯 あみだくじジェネレーター</h1>
 
   <div class="controls-container">
-    <label for="num-lines">縦線の本数 (2〜15): </label>
-    <input type="number" id="num-lines" value="5" min="2" max="15">
-    <button id="btn-setup">設定を適用</button>
+    <div class="input-group">
+      <label for="num-lines">縦線の本数 (2〜15): </label>
+      <input type="number" id="num-lines" value="5" min="2" max="15">
+    </div>
+    
+    <div class="input-group" style="background: #f8f9fa; padding: 10px; border-radius: 6px;">
+      <label for="density-slider">線の密度を追加 (無駄な互換の追加): <span id="density-display" style="color:#007bff;">0</span></label><br>
+      <input type="range" id="density-slider" min="0" max="100" value="0">
+      <div style="font-size: 12px; color: #666; margin-top: 5px;">数値を上げると、結果に影響しない複雑な経路が増えます。</div>
+    </div>
+
+    <button id="btn-setup">設定を適用 / リセット</button>
   </div>
 
   <div class="amida-wrapper">
     <div id="start-numbers"></div>
-    
     <canvas id="amida-canvas" width="600" height="400"></canvas>
-    
     <div id="goal-inputs"></div>
   </div>
 
   <div class="controls-container" style="margin-top: 20px;">
     <p style="font-size: 14px; color: #666; margin-bottom: 10px;">
-      上部の入力欄に、左から順にゴールの数字（1から縦線の本数まで）を重複しないように入力してください。
+      ゴールの数字（1〜縦線の本数）を重複しないように入力してください。
     </p>
-    <button id="btn-generate" style="background-color: #007bff; font-size: 18px; padding: 10px 24px;">あみだくじを生成する</button>
+    <button id="btn-generate" style="background-color: #28a745; font-size: 18px; padding: 10px 24px;">あみだくじを生成する</button>
     <div id="error-msg"></div>
   </div>
 
 <script>
   const CANVAS_WIDTH = 600;
   const CANVAS_DEFAULT_HEIGHT = 400;
-  const X_MARGIN = 50; // キャンバス左右の余白
+  const X_MARGIN = 50;
 
   let currentLinesCount = 5;
 
   document.addEventListener('DOMContentLoaded', () => {
     setupUI(currentLinesCount);
 
+    // スライダーの値をリアルタイムで表示
+    document.getElementById('density-slider').addEventListener('input', function() {
+      document.getElementById('density-display').innerText = this.value;
+    });
+
+    // 設定を適用（リセット）
     document.getElementById('btn-setup').addEventListener('click', () => {
       const numInput = parseInt(document.getElementById('num-lines').value);
       if (isNaN(numInput) || numInput < 2 || numInput > 15) {
@@ -155,7 +171,6 @@
     document.getElementById('btn-generate').addEventListener('click', generateAmida);
   });
 
-  // UI（縦線の間隔、番号、入力欄）をセットアップする関数
   function setupUI(n) {
     const spacing = (CANVAS_WIDTH - 2 * X_MARGIN) / (n - 1);
     
@@ -167,25 +182,21 @@
     for (let i = 0; i < n; i++) {
       const xPos = X_MARGIN + i * spacing;
 
-      // 上部のスタート番号
       const label = document.createElement('div');
       label.className = 'number-label';
       label.innerText = i + 1;
       label.style.left = xPos + 'px';
       startDiv.appendChild(label);
 
-      // 下部のゴール入力欄
       const input = document.createElement('input');
-      input.type = 'text'; // スマホ等で数値入力キーボードを出しつつ、自由な操作を担保
+      input.type = 'text';
       input.inputMode = 'numeric';
       input.className = 'goal-input';
       input.style.left = xPos + 'px';
-      // デフォルトで1〜nをランダムに配置してあげる（親切設計）
       input.value = ""; 
       goalDiv.appendChild(input);
     }
 
-    // キャンバスをクリアして縦線だけ描画
     const canvas = document.getElementById('amida-canvas');
     canvas.height = CANVAS_DEFAULT_HEIGHT;
     const ctx = canvas.getContext('2d');
@@ -203,17 +214,15 @@
     document.getElementById('error-msg').innerText = '';
   }
 
-
-  // あみだくじを計算して生成する関数
   function generateAmida() {
     const n = currentLinesCount;
+    const densityVal = parseInt(document.getElementById('density-slider').value) || 0;
     const inputs = document.querySelectorAll('.goal-input');
     const errorMsg = document.getElementById('error-msg');
     
     let targets = [];
     let isValid = true;
 
-    // 入力値の取得とバリデーション
     inputs.forEach(input => {
       const val = parseInt(input.value);
       if (isNaN(val) || val < 1 || val > n) {
@@ -231,8 +240,10 @@
 
     let current = [...targets];
     let history = [];
-    
-    const randomLineCount = n * 2; 
+
+    // 1. ゴール状態に対して、スライダーで指定した「密度（無駄な互換）」の数だけランダムな交換を加える。
+    // スライダーが0の時も「最小限の複雑さ(n * 2)」を保つようにします。
+    const randomLineCount = (n * 2) + densityVal; 
     for (let i = 0; i < randomLineCount; i++) {
       const idx = Math.floor(Math.random() * (n - 1));
       history.push(idx);
@@ -242,6 +253,7 @@
       current[idx + 1] = temp;
     }
 
+    // 2. 現在の状態を [1, 2, ..., n] に向かってソートしていく。
     while (true) {
       let inversions = [];
       for (let i = 0; i < n - 1; i++) {
@@ -264,27 +276,22 @@
     }
 
     history.reverse();
-
     drawLines(n, history);
   }
 
-
-  // キャンバスに線を描画する関数
   function drawLines(n, history) {
     const canvas = document.getElementById('amida-canvas');
     const ctx = canvas.getContext('2d');
 
-    // 線の数が多すぎると詰まってしまうため、キャンバスの高さを自動調整
+    // 線の密度（本数）に応じてキャンバスの高さを自動拡張
     const minLineSpacing = 25;
     const requiredHeight = (history.length + 1) * minLineSpacing;
     canvas.height = Math.max(CANVAS_DEFAULT_HEIGHT, requiredHeight);
 
-    // 白紙に戻す
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const spacing = (CANVAS_WIDTH - 2 * X_MARGIN) / (n - 1);
 
-    // 縦線の描画
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 3;
     for (let i = 0; i < n; i++) {
@@ -295,13 +302,12 @@
       ctx.stroke();
     }
 
-    // 横線の描画
     const ySpacing = canvas.height / (history.length + 1);
-    ctx.strokeStyle = '#007bff'; // 横線は青色にして見やすく
+    ctx.strokeStyle = '#007bff';
     ctx.lineWidth = 4;
 
     for (let k = 0; k < history.length; k++) {
-      const lineIndex = history[k]; // 0 〜 n-2 の値
+      const lineIndex = history[k];
       const y = ySpacing * (k + 1);
       const x1 = X_MARGIN + lineIndex * spacing;
       const x2 = x1 + spacing;
